@@ -1,42 +1,50 @@
 import streamlit as st
-from cozepy import Coze, TokenAuth, Message, ChatEventType
+import requests
+import json
 
 st.set_page_config(page_title="AI 搭子助手", page_icon="🤖")
 st.title("🤖 AI 搭子助手 - 由 Coze 驱动")
 
-# ========== 请替换成你自己的凭证 ==========
-COZE_API_TOKEN = "pat_pat_8KuJ2g2tTgk3UJC6ZmRJVyM7Tp3ziHwDJ1sUgRhkyPZ3mg7zcYcsDtgJALGgXGk3"   #
-BOT_ID = "7632668226932965418"         # 7632668226932965418
-# ========================================
+# ========== 已填入你的凭证 ==========
+COZE_API_TOKEN = "pat_8KuJ2g2tTgk3UJC6ZmRJVyM7Tp3ziHwDJ1sUgRhkyPZ3mg7zcYcsDtgJALGgXGk3"
+BOT_ID = "7632668226932965418"
+# ==================================
 
 def call_coze(user_input, chat_history):
     """调用 Coze Bot 获取回复"""
-    coze = Coze(auth=TokenAuth(token=COZE_API_TOKEN), base_url="https://api.coze.cn")
+    url = "https://api.coze.cn/v1/chat"
+    headers = {
+        "Authorization": f"Bearer {COZE_API_TOKEN}",
+        "Content-Type": "application/json"
+    }
     
-    # 构建历史消息
+    # 构建消息列表
     messages = []
     for msg in chat_history:
-        messages.append(Message(role=msg["role"], content=msg["content"]))
-    messages.append(Message(role="user", content=user_input))
+        messages.append({
+            "role": msg["role"],
+            "content": msg["content"]
+        })
+    messages.append({
+        "role": "user",
+        "content": user_input
+    })
     
-    full_response = ""
+    payload = {
+        "bot_id": BOT_ID,
+        "user_id": "streamlit_user",
+        "messages": messages,
+        "auto_save_history": True
+    }
+    
     try:
-        for event in coze.chat.stream(
-            bot_id=BOT_ID,
-            user_id="streamlit_user",
-            additional_messages=messages,
-            auto_save_history=True,
-        ):
-            if event.event == ChatEventType.CONVERSATION_MESSAGE_DELTA:
-                full_response += event.message.content
-            elif event.event == ChatEventType.CONVERSATION_MESSAGE_COMPLETED:
-                full_response = event.message.content
-            elif event.event == ChatEventType.ERROR:
-                return f"Coze 错误：{event.error.message if hasattr(event, 'error') else '未知'}"
+        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+        # 提取回复内容
+        return data["messages"][-1]["content"]
     except Exception as e:
         return f"调用 Coze 失败：{str(e)}"
-    
-    return full_response
 
 # 初始化会话状态
 if "messages" not in st.session_state:
@@ -56,6 +64,6 @@ if prompt:
     
     with st.chat_message("assistant"):
         with st.spinner("Coze 智能体思考中..."):
-            reply = call_coze(prompt, st.session_state.messages[:-1])  # 不包含刚添加的用户消息
+            reply = call_coze(prompt, st.session_state.messages[:-1])
             st.write(reply)
     st.session_state.messages.append({"role": "assistant", "content": reply})
