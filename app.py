@@ -12,7 +12,9 @@ BOT_ID = "7632668226932965418"
 
 def call_coze(user_input, chat_history):
     """调用 Coze Bot 获取回复"""
+    # 正确的 API 地址
     url = "https://api.coze.cn/v1/chat"
+    
     headers = {
         "Authorization": f"Bearer {COZE_API_TOKEN}",
         "Content-Type": "application/json"
